@@ -2,11 +2,11 @@ __author__ = 'Amit Mohapatra'
 
 import logging as log
 from common.reusable import Reusable
-from corpus_creator import CorpusCreator
-from semantic_similarity_algo import SemanticSimilarityAlgo
+from semantic_algo.corpus_creator import CorpusCreator
+from semantic_algo.semantic_similarity_algo import SemanticSimilarityAlgo
 
 
-class SemanticTrainer(object):
+class SemanticClassifier(object):
 
     def __init__(self, index_file_path, algo_name="lsi_logentropy", semantic_min_score=0.0):
         self.service = None
@@ -32,6 +32,7 @@ class SemanticTrainer(object):
             raise Exception("semantic_min_score should be of range 0.0 to 1.0")
 
         self.final_result = []
+        self.corpus_obj = CorpusCreator()
 
     def train(self, training_model):
         """
@@ -40,8 +41,7 @@ class SemanticTrainer(object):
         :return:
         """
         try:
-            corpus_obj = CorpusCreator(training_model)
-            corpus_obj.create_train_corpus()
+            self.corpus_obj.create_train_corpus(training_model)
             log.info("training model")
             self.service = SemanticSimilarityAlgo(self.index_file_path)
             self.service.train(corpus_obj.train_corpus, method=self.algo_name)
@@ -54,7 +54,10 @@ class SemanticTrainer(object):
             log.error(msg)
             raise Exception(msg)
 
-    def predict(self):
+    def predict(self, test_data):
+
+        test_corpus = self.corpus_obj.create_test_corpus(test_data)
+        self.service.index(test_corpus)
 
         for label_data in self.corpus_obj.test_ids:
             label_id = label_data[0]
@@ -75,10 +78,6 @@ class SemanticTrainer(object):
             else:
                 add_result["result"] = None
             self.final_result.append(add_result)
-
-    def fit(self, test_data):
-        self.corpus_obj.create_test_corpus(test_data)
-        self.service.index(self.corpus_obj.test_corpus)
 
     def delete(self, ids_list):
         """

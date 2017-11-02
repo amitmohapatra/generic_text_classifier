@@ -1,8 +1,8 @@
 __author__ = 'ricky'
 
 from os import path, sep
-from semantic_algo.semantic_trainer import SemanticTrainer
 
+from textclassifier.semantic import SemanticTrainer
 
 if __name__ == "__main__":
 
