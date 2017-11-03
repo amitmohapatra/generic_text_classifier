@@ -502,7 +502,10 @@ class SemanticSimilarityServer(object):
                 except:
                     pass
             randpart = hex(random.randint(0, 0xffffff))[2:]
-            file_name = "%s%s%s%s%s"%(self.basename, os.sep, "..", os.sep, 'sqldict' + randpart)
+            file_name = "%s%s%s%s%s" % (self.basename, os.sep, "..", os.sep, 'sqldict' + randpart)
+            print "####"
+            print file_name
+            print "####"
             self.fresh_docs = SqliteDict(filename = file_name, journal_mode=JOURNAL_MODE)  # buffer defaults to a random location in temp
         self.fresh_docs.sync()
 
@@ -574,6 +577,7 @@ class SemanticSimilarityServer(object):
                 method = 'lsi'
         if params is None:
             params = {}
+
         self.model = SimilarityModel(self.fresh_docs, method=method, params=params)
         self.flush(save_model=True, clear_buffer=clear_buffer)
 

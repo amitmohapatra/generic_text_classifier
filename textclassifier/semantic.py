@@ -9,8 +9,6 @@ from semantic_algo.semantic_similarity_algo import SemanticSimilarityAlgo
 class SemanticClassifier(object):
 
     def __init__(self, index_file_path, algo_name="lsi_logentropy", semantic_min_score=0.0):
-        self.service = None
-
 
         if Reusable.is_dir(index_file_path):
             self.index_file_path = index_file_path
@@ -32,7 +30,13 @@ class SemanticClassifier(object):
             raise Exception("semantic_min_score should be of range 0.0 to 1.0")
 
         self.final_result = []
-        self.corpus_obj = CorpusCreator()
+        self.service = SemanticSimilarityAlgo(self.index_file_path)
+        self.corpus_obj = CorpusCreator(self)
+
+    def __train_update(self, train_corpus):
+        self.service.train(train_corpus, method=self.algo_name)
+        self.service.index(train_corpus)
+        self.service.optimize()
 
     def train(self, training_model):
         """
@@ -41,12 +45,9 @@ class SemanticClassifier(object):
         :return:
         """
         try:
-            self.corpus_obj.create_train_corpus(training_model)
+            train_corpus = self.corpus_obj.create_train_corpus(training_model)
             log.info("training model")
-            self.service = SemanticSimilarityAlgo(self.index_file_path)
-            self.service.train(corpus_obj.train_corpus, method=self.algo_name)
-            self.service.index(corpus_obj.train_corpus)
-            self.service.optimize()
+            self.__train_update(train_corpus)
             log.info("indexing finished")
         except:
             trace_err = Reusable.get_stack_trace()
@@ -57,27 +58,34 @@ class SemanticClassifier(object):
     def predict(self, test_data):
 
         test_corpus = self.corpus_obj.create_test_corpus(test_data)
-        self.service.index(test_corpus)
 
-        for label_data in self.corpus_obj.test_ids:
-            label_id = label_data[0]
-            label_text = label_data[1]
-            semantic_result = self.service.find_similar(label_id, min_score=self.semantic_min_score)
-            add_result = dict()
-            add_result["query"] = label_text
+        if test_corpus:
+            self.service.index(test_corpus)
 
-            if semantic_result:
-                # sort the result.
-                sorted_result = self.__do_sort_result(label_id, semantic_result)
-                best_match = sorted_result[0]
-                prdict_label = best_match[0].split("_*&$*_")[0]
-                prdict_score = best_match[1]
-                add_result['predicted_label'] = prdict_label
-                add_result['predicted_score'] = prdict_score
-                add_result['matched_doc'] = self.corpus_obj.actual_match_with[best_match[0]]
-            else:
-                add_result["result"] = None
-            self.final_result.append(add_result)
+            for label_data in self.corpus_obj.test_ids:
+                label_id = label_data[0]
+                label_text = label_data[1]
+                print label_id
+                print label_text
+                semantic_result = self.service.find_similar(label_id, min_score=self.semantic_min_score)
+                print semantic_result
+                add_result = dict()
+                add_result["query"] = label_text
+
+                if semantic_result:
+                    # sort the result.
+                    sorted_result = self.__do_sort_result(label_id, semantic_result)
+                    if sorted_result:
+                        best_match = sorted_result[0]
+                        prdict_label = best_match[0].split("_")[0]
+                        prdict_score = best_match[1]
+                        add_result['predicted_label'] = prdict_label
+                        add_result['predicted_score'] = prdict_score
+                    else:
+                        add_result["result"] = None
+                else:
+                    add_result["result"] = None
+                self.final_result.append(add_result)
 
     def delete(self, ids_list):
         """
