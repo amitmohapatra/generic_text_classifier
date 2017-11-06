@@ -10,6 +10,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_selection import SelectFromModel
 from sklearn.feature_selection import SelectKBest, chi2
@@ -28,11 +29,22 @@ from sklearn import metrics
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score
 
+from sklearn.decomposition import TruncatedSVD
+
+from textclassifier.text_processor.text_normalizer import TextNormalizer
+from textclassifier.text_processor.text_stats import TextStats
+
 # Algo used
+"""
 bernoulli_pipeline = Pipeline([('vect', CountVectorizer(stop_words='english')),
                                ('tfidf', TfidfTransformer()),
                                ('clf', BernoulliNB()), ])
-
+"""
+bernoulli_pipeline = Pipeline([
+                                ('vect',  CountVectorizer(stop_words='english')),
+                               ('tfidf', TfidfTransformer()),
+                               ('clf', BernoulliNB()),
+                            ])
 # tuning the algo
 bernoulli_pipeline_param = {'vect__ngram_range': [(1, 2)],
                              'tfidf__use_idf': (True, False),
@@ -101,11 +113,11 @@ des_pipeline = Pipeline([
                         ])
 # creating the pipeline to adopt any sklearn algo
 #gs_clf = GridSearchCV(bernoulli_pipeline, bernoulli_pipeline_param, cv=5)
-gs_clf = GridSearchCV(bernoulli_pipeline, bernoulli_pipeline_param, cv=5, error_score='precision')
+#gs_clf = GridSearchCV(bernoulli_pipeline, bernoulli_pipeline_param, error_score='precision')
 # traing data and creating model
 
-base_path = path.dirname(path.dirname(__file__))
-model_store_path = "%s%s%s%s%s%s%s" % (base_path, sep, "resource", sep, "model", sep, "model.json")
+gs_clf = BernoulliNB()
+model_store_path = "/Users/ricky/my_public_projects/full_model.json"
 
 train = []
 label = []
@@ -119,10 +131,34 @@ for k, v in data.iteritems():
     train.extend(v)
     label.extend([k] * len_v)
 print len(train)
-model = gs_clf.fit(train, label)
-result = model.predict(["jack daniel", "remmy martin", "roberto cavalli"])
-print result
-print model.best_estimator_
+print len(label)
+
+vectorizer = CountVectorizer()
+X_train_counts = vectorizer.fit_transform(train)
+
+
+
+from sklearn import preprocessing
+le = preprocessing.LabelEncoder()
+le1 = le.fit_transform(label)
+
+model = gs_clf.fit(X_train_counts, le1)
+
+vectorizer1 = CountVectorizer()
+X_test_counts = vectorizer1.fit_transform(["jack daniel", "remmy martin", "roberto cavalli"])
+
+
+
+result = model.predict(X_test_counts)
+print len(label)
+print len(result)
+print le.inverse_transform(result)
 print model.scoring
 #print accuracy_score(result, label, normalize=False)
 #print accuracy_score(result, label)
+
+model.fit(["dcvhdks ksdcjkvsbk kdvijkvbjks "], ["wine"])
+result = model.predict(["dcvhdks", "ksdcjkvsbk martin", "kdvijkvbjks cavalli"])
+print result
+result = model.predict(["jack daniel", "remmy martin", "roberto cavalli"])
+print result

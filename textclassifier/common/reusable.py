@@ -2,12 +2,14 @@ __author__ = 'Amit Mohapatra'
 
 import sys
 import json
+import glob
+import pickle
 import shutil
 import string
 import traceback
 import logging as log
-from os import path, unlink, walk
 
+from os import path, unlink, walk, makedirs, remove
 from nltk import PorterStemmer, word_tokenize
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
@@ -55,9 +57,9 @@ class Reusable(object):
             return dir_path
         except:
             trace_err = Reusable.get_stack_trace()
-            err_msg = "TextProcessor : empty_dir() : %s%s" % ("\n", trace_err)
+            err_msg = "Reusable : empty_dir() : %s%s" % ("\n", trace_err)
             log.error(err_msg)
-            raise Exception(err_msg)
+            raise
 
     @staticmethod
     def stem_words(cleaned_words):
@@ -66,9 +68,9 @@ class Reusable(object):
             return " ".join(final_stemming_content)
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (stem_words()) : %s%s" % ("\n", trace_err)
+            msg = "Reusable (stem_words()) : %s%s" % ("\n", trace_err)
             log.error(msg)
-            raise Exception(msg)
+            raise
 
     @staticmethod
     def is_abs_path_exist(my_path):
@@ -82,29 +84,75 @@ class Reusable(object):
             if path.exists(my_path):
                 return True
             else:
-                log.error("%s does not exist" % my_path)
-                raise Exception("%s does not exist" % my_path)
+                return False
         else:
             log.error("%s is not absolute" % my_path)
-            raise Exception("%s is not absolute" % my_path)
+            raise
 
     @staticmethod
-    def is_dir(my_path):
+    def is_dir(_path):
         """
         check if a path is absolute path or not
         :param my_path: path
         :return: boolean
         """
 
-        if path.isdir(my_path):
-            if path.exists(my_path):
+        if path.isdir(_path):
+            if path.exists(_path):
                 return True
             else:
-                log.error("dir %s does not exist" % my_path)
-                raise Exception("dir %s does not exist" % my_path)
+                log.error("dir %s does not exist" % _path)
+                raise Exception("dir %s does not exist" % _path)
         else:
-            log.error("%s is not a directory" % my_path)
-            raise Exception("%s is not a director" % my_path)
+            log.error("%s is not a directory" % _path)
+            raise
+
+    @staticmethod
+    def create_dir(_path):
+        """
+        check if a path is absolute path or not
+        :param my_path: path
+        :return: boolean
+        """
+
+        try:
+            if not path.exists(_path):
+                makedirs(_path)
+            return _path
+        except Exception as e:
+            trace_err = Reusable.get_stack_trace()
+            msg = "Reusable (create_dir()) : %s%s" % ("\n", trace_err)
+            log.error(msg)
+            raise
+
+    @staticmethod
+    def write_pickle_file(_path, content):
+        try:
+            if path.exists(_path):
+                remove(_path)
+            with open(_path, 'wb') as fp:
+                pickle.dump(content, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            return _path
+        except Exception as e:
+            trace_err = Reusable.get_stack_trace()
+            msg = "Reusable (write_pickle_file()) : %s%s" % ("\n", trace_err)
+            log.error(msg)
+            raise
+
+    @staticmethod
+    def read_pickle_file(_path):
+        try:
+            if path.exists(_path):
+                with open(_path, 'rb') as fp:
+                    item = pickle.load(fp)
+            else:
+                raise Exception("file path not exit : %s" % _path)
+            return item
+        except Exception as e:
+            trace_err = Reusable.get_stack_trace()
+            msg = "Reusable (write_pickle_file()) : %s%s" % ("\n", trace_err)
+            log.error(msg)
+            raise
 
     @staticmethod
     def read_file(file_path):
@@ -126,7 +174,23 @@ class Reusable(object):
             return file_content
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (read_file()) : %s%s" % ("\n", trace_err)
+            msg = "Reusable (read_file()) : %s%s" % ("\n", trace_err)
+            log.error(msg)
+            raise Exception(msg)
+
+    @staticmethod
+    def remove_multi_file_with_name(file_path):
+        """
+        reading a file.
+        :param file_path: absolute file path
+        :return: file content as string
+        """
+        try:
+            for f in glob.glob(file_path):
+                remove(f)
+        except:
+            trace_err = Reusable.get_stack_trace()
+            msg = "Reusable (read_file()) : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)
 
@@ -147,7 +211,7 @@ class Reusable(object):
             return data
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (read_file()) : %s%s" % ("\n", trace_err)
+            msg = "Reusable (read_file()) : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)
 
@@ -167,7 +231,7 @@ class Reusable(object):
             return data
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (read_file()) : %s%s" % ("\n", trace_err)
+            msg = "Reusable (read_file()) : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)
 
@@ -188,8 +252,7 @@ class Reusable(object):
                     tokens = []
 
                     for word in word_tokens:
-                        word = word.strip('`~!@#$%^&*()_+-={}|[]:";<>?,.').strip('`~!@#$%^&*()_+-={}|[]:";<>?,.')\
-                               .strip('`~!@#$%^&*()_+-={}|[]:";<>?,.')
+                        word = word.strip('`~!@#$%^&*()_+-={}|[]:";<>?,.')
                         tokens.append(word)
 
                     tokens = [i for i in tokens if i not in string.punctuation]
@@ -200,7 +263,7 @@ class Reusable(object):
                 return []
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (sentence_tokenize()) : error while tokenizing sentence : %s%s" % ("\n", trace_err)
+            msg = "Reusable (sentence_tokenize()) : error while tokenizing sentence : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)
 
@@ -218,7 +281,7 @@ class Reusable(object):
                 return " "
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (strip_text()) : error while striping sentence : %s%s" % ("\n", trace_err)
+            msg = "Reusable (strip_text()) : error while striping sentence : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)
 
@@ -239,6 +302,6 @@ class Reusable(object):
                 return " "
         except:
             trace_err = Reusable.get_stack_trace()
-            msg = "TextProcessor (remove_codec()) : error while removing codec : %s%s" % ("\n", trace_err)
+            msg = "Reusable (remove_codec()) : error while removing codec : %s%s" % ("\n", trace_err)
             log.error(msg)
             raise Exception(msg)

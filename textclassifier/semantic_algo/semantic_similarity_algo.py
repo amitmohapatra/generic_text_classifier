@@ -16,7 +16,7 @@ from sqlitedict import SqliteDict
 
 TOP_SIMS = 100  # when precomputing similarities, only consider this many most similar documents
 SHARD_SIZE = 65536  # spill index shards to disk in shard sized chunks of documents
-DEFAULT_NUM_TOPICS = 400  # use this many topics for topic models unless user specified a value
+DEFAULT_NUM_TOPICS = 500  # use this many topics for topic models unless user specified a value
 JOURNAL_MODE = 'OFF'  # don't keep journals in sqlite dbs
 
 
@@ -302,30 +302,8 @@ class SimilarityModel(gensim.utils.SaveLoad):
             params = {}
         self.params = params
         logger.info("collecting %i document ids" % len(fresh_docs))
-        docids = fresh_docs.keys()
-        logger.info("creating model from %s documents" % len(docids))
-        preprocessed = lambda: (fresh_docs[docid]['tokens'] for docid in docids)
 
-        # create id->word (integer->string) mapping
-        logger.info("creating dictionary from %s documents" % len(docids))
-        if dictionary is None:
-            dictionary = gensim.corpora.Dictionary(preprocessed())
-            if len(docids) >= 1000:
-                dictionary.filter_extremes(no_below=5, no_above=0.2, keep_n=50000)
-            else:
-                logger.warning("training model on only %i documents; is this intentional?" % len(docids))
-                dictionary.filter_extremes(no_below=0, no_above=1.0, keep_n=50000)
-        self.dictionary = dictionary
-
-        class IterableCorpus(object):
-            def __iter__(self):
-                for tokens in preprocessed():
-                    yield dictionary.doc2bow(tokens)
-
-            def __len__(self):
-                return len(docids)
-
-        corpus = IterableCorpus()
+        corpus = self.create_corpus(fresh_docs, dictionary)
 
         if self.method == 'lsi':
             logger.info("training LSI model")
@@ -376,6 +354,42 @@ class SimilarityModel(gensim.utils.SaveLoad):
             msg = "unknown semantic method %s" % method
             logger.error(msg)
             raise NotImplementedError(msg)
+
+    def update_model(self, fresh_docs):
+        corpus = self.create_corpus(fresh_docs, None, update_model=True)
+        logent = gensim.models.LogEntropyModel(corpus)
+        logent_corpus = logent[corpus]
+
+    def create_corpus(self, fresh_docs, dictionary, update_model=False):
+
+        docids = fresh_docs.keys()
+        logger.info("creating model from %s documents" % len(docids))
+        preprocessed = lambda: (fresh_docs[docid]['tokens'] for docid in docids)
+
+        # create id->word (integer->string) mapping
+        logger.info("creating dictionary from %s documents" % len(docids))
+        if dictionary is None:
+            dictionary = gensim.corpora.Dictionary(preprocessed())
+            if len(docids) >= 1000:
+                dictionary.filter_extremes(no_below=5, no_above=0.2, keep_n=50000)
+            else:
+                logger.warning("training model on only %i documents; is this intentional?" % len(docids))
+                dictionary.filter_extremes(no_below=0, no_above=1.0, keep_n=50000)
+
+        if not update_model:
+            self.dictionary = dictionary
+        else:
+            self.dictionary = self.dictionary.merge_with(dictionary)
+
+        class IterableCorpus(object):
+            def __iter__(self):
+                for tokens in preprocessed():
+                    yield dictionary.doc2bow(tokens)
+
+            def __len__(self):
+                return len(docids)
+        corpus = IterableCorpus()
+        return corpus
 
     def doc2vec(self, doc):
         """
@@ -501,12 +515,10 @@ class SemanticSimilarityServer(object):
                     self.fresh_docs.terminate()  # erase all buffered documents + file on disk
                 except:
                     pass
+
             randpart = hex(random.randint(0, 0xffffff))[2:]
             file_name = "%s%s%s%s%s" % (self.basename, os.sep, "..", os.sep, 'sqldict' + randpart)
-            print "####"
-            print file_name
-            print "####"
-            self.fresh_docs = SqliteDict(filename = file_name, journal_mode=JOURNAL_MODE)  # buffer defaults to a random location in temp
+            self.fresh_docs = SqliteDict(filename=file_name, journal_mode=JOURNAL_MODE)  # buffer defaults to a random location in temp
         self.fresh_docs.sync()
 
     def close(self):
@@ -570,7 +582,7 @@ class SemanticSimilarityServer(object):
         if method == 'auto':
             numdocs = len(self.fresh_docs)
             if numdocs < 1000:
-                logging.warning(
+                logger.warning(
                     "too few training documents; using simple log-entropy model instead of latent semantic indexing")
                 method = 'logentropy'
             else:
@@ -580,6 +592,10 @@ class SemanticSimilarityServer(object):
 
         self.model = SimilarityModel(self.fresh_docs, method=method, params=params)
         self.flush(save_model=True, clear_buffer=clear_buffer)
+
+    @gensim.utils.synchronous('lock_update')
+    def update_model(self):
+        self.model.update_model(self.fresh_docs)
 
     @gensim.utils.synchronous('lock_update')
     def index(self, corpus=None, clear_buffer=True):
@@ -914,6 +930,16 @@ class SemanticSimilarityAlgo(gensim.utils.SaveLoad):
         return result
 
     @gensim.utils.synchronous('lock_update')
+    def update(self):
+        """
+        Update semantic model, in the current session.
+        """
+        self.check_session()
+        self.session.update_model()
+        if self.autosession:
+            self.commit()
+
+    @gensim.utils.synchronous('lock_update')
     def drop_index(self, keep_model=True):
         """
         Drop all indexed documents from the session. Optionally, drop model too.
@@ -1050,3 +1076,4 @@ class SemanticSimilarityAlgo(gensim.utils.SaveLoad):
 
     def status(self):  # str() alias
         return str(self)
+
