@@ -26,9 +26,10 @@ if __name__ == "__main__":
 
 
 
-    s_obj =  Pyro4.Proxy("PYRO:example.semantic@localhost:65528")._pyroRelease()
-    #s_obj.train(train_corpus, algo_name="lda_logentropy")
-    print s_obj.predict("kingfisher beer")
+    #s_obj =  Pyro4.Proxy("PYRO:example.semantic@localhost:65528")._pyroRelease()
+    s_obj = SemanticClassifier(index_file_path)
+    s_obj.train(train_corpus, algo_name="lsi_tfidf")
+    print s_obj.predict("chicken muttor paneer rajma kingfisher beer magic moments remmy martin soda water ice cream")
     #s_obj.train_update([{"id": "whisky_1212", "tokens": ["soju 80ml"]}])
     print s_obj.predict(["kingfisher ber"])
     #s_obj.train_update([{"id": "whisky_1212", "tokens" : ["soju is nice "]}])

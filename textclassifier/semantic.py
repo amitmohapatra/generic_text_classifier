@@ -133,6 +133,7 @@ class SemanticClassifier(object):
 
         try:
             sorted_result = sorted([(r[0], r[1] * 100.0) for r in semantic_result], key=lambda t: t[1], reverse=True)
+            print sorted_result
             return sorted_result
         except:
             trace_err = Reusable.get_stack_trace()
